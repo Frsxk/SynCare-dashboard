@@ -9,6 +9,29 @@ import { useHydrated } from "./use-hydrated";
 const schema = z.object({ identifier: z.string().trim().min(1, "Isi identitas akun.").max(320), password: z.string().min(1, "Isi kata sandi.").max(128) });
 type LoginInput = z.infer<typeof schema>;
 
+const loginFailureCopy = {
+  origin_not_allowed: "Permintaan masuk ditolak karena alamat dashboard tidak sesuai. Buka dashboard melalui alamat yang diberikan operator, lalu coba lagi.",
+  forbidden: "Gunakan akun perawat yang berwenang. Akun pasien digunakan melalui aplikasi pasien.",
+  unauthenticated: "Akun atau kata sandi tidak sesuai.",
+  rate_limited: "Terlalu banyak percobaan masuk. Coba kembali nanti.",
+  validation_failed: "Periksa kembali data yang dikirim.",
+  dependency_unavailable: "Belum dapat terhubung. Periksa koneksi lalu coba lagi.",
+} as const;
+
+// Only a bounded, recognized machine code may select copy. Server text, Origin and identifiers are never rendered.
+export function loginFailureMessage(status: number, payload: unknown): string {
+  const nested = payload && typeof payload === "object" && "error" in payload ? (payload as { error?: unknown }).error : null;
+  const code = nested && typeof nested === "object" && "code" in nested ? (nested as { code?: unknown }).code : null;
+  if (typeof code === "string" && code.length <= 64 && Object.prototype.hasOwnProperty.call(loginFailureCopy, code)) {
+    return loginFailureCopy[code as keyof typeof loginFailureCopy];
+  }
+  if (status === 401) return loginFailureCopy.unauthenticated;
+  if (status === 429) return loginFailureCopy.rate_limited;
+  if (status === 422) return loginFailureCopy.validation_failed;
+  if (status === 403) return "Masuk tidak dapat dilakukan. Hubungi operator bila masalah berlanjut.";
+  return "Belum dapat terhubung. Periksa koneksi lalu coba lagi.";
+}
+
 export function LoginForm({ revokeUnconfirmed = false }: { revokeUnconfirmed?: boolean }) {
   const hydrated = useHydrated();
   const [failure, setFailure] = useState<string | null>(null);
@@ -18,7 +41,10 @@ export function LoginForm({ revokeUnconfirmed = false }: { revokeUnconfirmed?: b
     try {
       const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input), credentials: "same-origin", cache: "no-store", redirect: "error" });
       if (!response.ok) {
-        setFailure(response.status === 401 ? "Akun atau kata sandi tidak sesuai." : response.status === 403 ? "Gunakan akun perawat yang berwenang. Akun pasien digunakan melalui aplikasi pasien." : response.status === 429 ? "Terlalu banyak percobaan masuk. Coba kembali nanti." : "Belum dapat terhubung. Periksa koneksi lalu coba lagi.");
+        const raw = await response.text();
+        let payload: unknown = null;
+        if (raw.length <= 2048) { try { payload = JSON.parse(raw); } catch { payload = null; } }
+        setFailure(loginFailureMessage(response.status, payload));
         return;
       }
       const channel = new BroadcastChannel("syncare-session");

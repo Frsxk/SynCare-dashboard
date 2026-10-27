@@ -12,7 +12,7 @@ const failure = (status: number, code: string) => Response.json({ error: { code,
 export async function browserLogin(request: Request): Promise<Response> {
   try {
     const config = authConfiguration();
-    if (request.headers.get("origin") !== config.webOrigin) return failure(403, "forbidden");
+    if (request.headers.get("origin") !== config.webOrigin) return failure(403, "origin_not_allowed");
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json") return failure(422, "validation_failed");
     const reader = request.body?.getReader();
     if (!reader) return failure(422, "validation_failed");
@@ -60,7 +60,7 @@ export async function browserSession(request: Request): Promise<Response> {
   }
   try {
     const config = authConfiguration();
-    if (request.headers.get("origin") !== config.webOrigin) return failure(403, "forbidden");
+    if (request.headers.get("origin") !== config.webOrigin) return failure(403, "origin_not_allowed");
     const jar = await cookies();
     const saved = openCredential(jar.get(SESSION_COOKIE)?.value, config.secret);
     if (saved && !validCsrf(request.headers.get("x-csrf-token"), saved.token, config.secret)) return failure(403, "forbidden");

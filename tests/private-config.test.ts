@@ -50,6 +50,42 @@ describe("dashboard-owned private configuration adapter", () => {
     expect(String(failure)).not.toContain("AAAAAAAA");
   });
 
+  test.each([
+    "aesgcm:v1:",
+    "aesgcm:v1:not+base64!",
+    "aesgcm:v1:AAAA-AA",
+    `aesgcm:v1:${Buffer.alloc(27).toString("base64")}`,
+  ])("malformed or structurally incomplete Linux envelope %j fails closed without leaking its value", value => {
+    const environment: Record<string, string | undefined> = { SYNTHETIC: value };
+    let failure: unknown;
+    try { unprotectEnvironment(environment); } catch (error) { failure = error; }
+    expect((failure as Error)?.message).toBe("invalid_private_envelope");
+    expect(environment.SYNTHETIC).toBe(value);
+    expect(String(failure)).not.toContain(value);
+    expect(String(failure)).not.toContain("AAAA");
+  });
+
+  test.each([
+    `aesgcm:v2:${"A".repeat(64)}`,
+    `aesgcm:${"A".repeat(64)}`,
+    `aesgcm:v10:${"A".repeat(64)}`,
+  ])("unsupported Linux envelope form %j fails closed instead of being used as a literal", value => {
+    const environment: Record<string, string | undefined> = { SYNTHETIC: value };
+    let failure: unknown;
+    try { unprotectEnvironment(environment); } catch (error) { failure = error; }
+    expect((failure as Error)?.message).toBe("invalid_private_envelope");
+    expect(environment.SYNTHETIC).toBe(value);
+    expect(String(failure)).not.toContain(value);
+  });
+
+  test("a structurally valid Linux envelope without its key fails closed on every platform", () => {
+    const value = `aesgcm:v1:${Buffer.alloc(40, 7).toString("base64")}`;
+    let failure: unknown;
+    try { unprotectEnvironment({ SYNTHETIC: value }); } catch (error) { failure = error; }
+    expect((failure as Error).message).toBe(process.platform === "win32" ? "unsupported_private_envelope" : "private_key_unavailable");
+    expect(String(failure)).not.toContain(value);
+  });
+
   test.skipIf(process.platform === "win32")("a well-formed DPAPI value rejects explicitly on non-Windows", () => {
     const value = sealedValue(sentinel);
     expect(() => unprotectEnvironment({ SYNTHETIC: value })).toThrow("windows_protection_required");

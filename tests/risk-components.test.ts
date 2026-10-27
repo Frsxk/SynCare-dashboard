@@ -36,3 +36,39 @@ test("historical category is non-applicable while current risk awaits review", (
   expect(html).toContain("Perlu penilaian dan konfirmasi ulang"); expect(html).toContain("Kategori sebelumnya: LOW");
   expect(html).not.toContain("Kategori dikonfirmasi:");
 });
+
+const assessment = (state: "RUNNING" | "UNKNOWN") => ({ id: `synthetic-${state.toLowerCase()}`, patientId: "p", dischargeId: "source-a",
+  sourceVersion: 1, actorId: "nurse-a", version: state === "UNKNOWN" ? 2 : 1, state, createdAt: evidence.confirmedAt,
+  completedAt: state === "UNKNOWN" ? evidence.confirmedAt : null, output: null,
+  failureCode: state === "UNKNOWN" ? "outcome_unknown" : null });
+
+function reviewHtml(latest: ReturnType<typeof assessment>, confirmed = true) {
+  const value: Overview = { ...overview, latestAssessment: latest,
+    confirmedRisk: confirmed ? overview.confirmedRisk : { status: "unconfirmed", current: null, previous: null } };
+  return renderToStaticMarkup(createElement(PatientSessionData, { principalId: "nurse-a", csrfToken: "synthetic-component-csrf" },
+    createElement(AssessmentReview, { overview: value, assessments: [latest], confirmations: confirmed ? [evidence] : [], disabled: false, onRefresh: async () => {} })));
+}
+
+test("RUNNING is presented as in progress with no new-assessment action enabled", () => {
+  const html = reviewHtml(assessment("RUNNING"));
+  expect(html).toContain("Penilaian F1 masih tercatat berjalan");
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Penilaian sedang berjalan<\/button>/);
+  expect(html).not.toMatch(/<button[^>]*>Jalankan penilaian baru<\/button>/);
+});
+
+test("UNKNOWN states an honest interruption, offers only an explicit new assessment and never confirms it", () => {
+  const html = reviewHtml(assessment("UNKNOWN"), false);
+  expect(html).toContain("Penilaian sebelumnya terhenti atau hasilnya tidak dapat dipastikan");
+  expect(html).toMatch(/<button[^>]*>Jalankan penilaian baru<\/button>/);
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Konfirmasi kategori belum tersedia<\/button>/);
+  expect(html).not.toContain("Konfirmasi kategori LOW");
+});
+
+test("an earlier valid same-source confirmation remains visible when a later assessment is interrupted", () => {
+  const risk = renderToStaticMarkup(createElement(RiskEvidenceSummary, { overview })).replace(/<!--.*?-->/g, "");
+  const review = reviewHtml(assessment("UNKNOWN"));
+  expect(risk).toContain("Kategori dikonfirmasi: <strong>LOW</strong>");
+  expect(review).toContain("Hasil pemrosesan belum dapat dipastikan");
+  expect(review).toContain("Berlaku untuk sumber aktif.");
+  expect(review).not.toContain("Kategori dikonfirmasi:");
+});

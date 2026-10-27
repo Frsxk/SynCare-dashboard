@@ -30,6 +30,7 @@ export function AssessmentReview({ overview, assessments, confirmations, disable
   const [message, setMessage] = useState<string | null>(null);
   const latest = overview.latestAssessment, source = overview.currentDischarge;
   const busy = disabled || phase !== "idle";
+  const running = latest?.state === "RUNNING", interrupted = latest?.state === "UNKNOWN";
   const canConfirm = latest?.state === "SUCCEEDED" && latest.output !== null && latest.dischargeId === source?.id && !confirmations.some(c => c?.assessmentId === latest.id);
   const fail = async (error: unknown) => {
     const failure = error instanceof ApiFailure ? error : new ApiFailure("processing_failed");
@@ -39,19 +40,22 @@ export function AssessmentReview({ overview, assessments, confirmations, disable
   return <section className="clinical-section"><h2>Penilaian F1 dan review perawat</h2>
     <p>Hasil F1 adalah usulan. Kategori pasien aktif memerlukan konfirmasi perawat pada sumber yang sama.</p>
     {!source && <p>Simpan ringkasan pulang sebelum menjalankan penilaian.</p>}
+    {running && <p className="clinical-notice" role="status">Penilaian F1 masih tercatat berjalan pada sumber ini. Tunggu hasil atau periksa status terbaru; jangan menjalankan penilaian baru selama statusnya belum pasti.</p>}
+    {interrupted && <p className="clinical-notice" role="alert">Penilaian sebelumnya terhenti atau hasilnya tidak dapat dipastikan. Tidak ada skor atau konfirmasi otomatis dari hasil yang hilang. Periksa status terbaru terlebih dahulu; jalankan penilaian baru hanya sebagai keputusan sadar setelah layanan tersedia.</p>}
     {message && <p role="status">{message}</p>}
-    <div className="clinical-actions"><Button disabled={busy || !source || latest?.state === "RUNNING"} onClick={async () => {
+    <div className="clinical-actions"><Button disabled={busy || !source || running} onClick={async () => {
       if (!source) return;
-      setPhase("running"); setMessage("Menjalankan F1. Ringkasan pulang tetap tersimpan.");
-      if (intent.current?.source !== source.id) intent.current = { source: source.id, key: crypto.randomUUID() };
+      setPhase("running"); setMessage(interrupted ? "Menjalankan penilaian baru. Ringkasan pulang tetap tersimpan." : "Menjalankan F1. Ringkasan pulang tetap tersimpan.");
+      // An interrupted assessment must never reuse its old intent: a new row is created only by this deliberate click.
+      if (interrupted || intent.current?.source !== source.id) intent.current = { source: source.id, key: crypto.randomUUID() };
       try {
         const result = await session.api.request(`/v1/discharges/${source.id}/assessments`, { method: "POST", body: {}, schema: assessmentEnvelope, idempotencyKey: intent.current.key, timeoutMs: 90000 });
         setMessage(states[result.data.state]);
         if (result.data.state !== "RUNNING") intent.current = null;
         await onRefresh();
       } catch (error) { await fail(error); } finally { setPhase("idle"); }
-    }}>{phase === "running" ? "Menilai sumber..." : "Jalankan penilaian F1"}</Button>
-      <Button variant="outline" disabled={busy} onClick={() => { void onRefresh(); }}>Periksa hasil terbaru</Button></div>
+    }}>{phase === "running" ? "Menilai sumber..." : running ? "Penilaian sedang berjalan" : interrupted ? "Jalankan penilaian baru" : "Jalankan penilaian F1"}</Button>
+      <Button variant="outline" disabled={busy} onClick={() => { void onRefresh(); }}>{running || interrupted ? "Periksa status penilaian" : "Periksa hasil terbaru"}</Button></div>
     {latest ? <article className="assessment-evidence"><h3>{states[latest.state]}</h3><p>Sumber versi {latest.sourceVersion}. Dicatat {latest.createdAt}.</p>
       {latest.output ? <><p>Usulan kategori: <strong>{latest.output.tier}</strong>. Skor asli F1: {latest.output.score}.</p><p>{latest.output.rationale}</p>
         <h4>Faktor dari F1</h4><dl>{Object.entries(latest.output.risk_factors).map(([name, factor]) => <div key={name}><dt>{factorLabels[name] ?? name}</dt>

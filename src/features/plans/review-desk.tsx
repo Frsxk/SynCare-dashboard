@@ -23,6 +23,8 @@ function PlanWorkspace({ patientId, principalId, initialDraftId, initialReviewId
   const review = useQuery({ ...session.options(["review", reviewId], `/v1/reviews/${reviewId}`, reviewEnvelope), enabled: !!reviewId, refetchInterval: q => q.state.data && terminalReview(q.state.data.data.state) ? false : 3000,
     structuralSharing: (oldValue, nextValue) => { const old = reviewEnvelope.safeParse(oldValue), next = reviewEnvelope.safeParse(nextValue); return old.success && next.success && old.data.data.version > next.data.data.version ? oldValue : nextValue; } });
   const live = !!reviewId && !terminalReview(review.data?.data.state ?? "") && !denied(review.error);
+  // Polling is a read: a valid cached gate stays actionable while a background GET is in flight.
+  // Only mutation uncertainty, access loss, or a failed/denied read with no trusted gate disables it.
   useEffect(() => {
     if (!live) return;
     const events = new EventSource(`/api/syncare/v1/reviews/${encodeURIComponent(reviewId)}/stream`);
@@ -61,7 +63,7 @@ function PlanWorkspace({ patientId, principalId, initialDraftId, initialReviewId
     <section className="clinical-section"><h2>Review tersimpan</h2>{list.data?.pages.every(p => p.data.length === 0) && <p>Belum ada review tersimpan untuk pasien ini.</p>}<ul>{list.data?.pages.flatMap(p => p.data).map(r => <li key={r.id}><Button variant="outline" disabled={blocked} onClick={() => open(r.draftId, r.id)}>{reviewLabels[r.state]} · {visitTime(r.createdAt)}</Button></li>)}</ul>{list.hasNextPage && <Button variant="outline" disabled={blocked || list.isFetching} onClick={() => { void list.fetchNextPage(); }}>Muat review berikutnya</Button>}</section>
     {draftId && (currentDraft ? <DraftContent draft={currentDraft} disabled={blocked || draft.isFetching || draft.isError || !!reviewId || !!existingReview} submit={submit} /> : <AsyncPanel state={draft.isError ? { kind: "error", failure: failure(draft.error), onRetry: () => { void draft.refetch(); } } : { kind: "loading" }} />)}
     {!reviewId && existingReview && <Button variant="outline" disabled={blocked} onClick={() => open(existingReview.draftId, existingReview.id)}>Buka review draf ini yang tersimpan</Button>}
-    {reviewId && (currentReview ? <ReviewContent key={currentReview.id} review={currentReview} actorId={principalId} disabled={blocked || review.isFetching || review.isError} submit={submit} openRevision={id => open(id, "")} /> : <AsyncPanel state={review.isError ? { kind: "error", failure: failure(review.error), onRetry: () => { void review.refetch(); } } : { kind: "loading" }} />)}
+    {reviewId && (currentReview ? <ReviewContent key={currentReview.id} review={currentReview} actorId={principalId} disabled={blocked || review.isError} submit={submit} openRevision={id => open(id, "")} /> : <AsyncPanel state={review.isError ? { kind: "error", failure: failure(review.error), onRetry: () => { void review.refetch(); } } : { kind: "loading" }} />)}
     <div role="status" aria-live="polite">{mutation.isPending ? <p>Permintaan sedang disimpan...</p> : mutation.isError ? <p>{failure(mutation.error).message}</p> : mutation.isSuccess ? <p>Permintaan tersimpan. Status di bawah mengikuti bukti server.</p> : null}</div>
     {unknown && <Button disabled={mutation.isPending} onClick={() => { if (intent.current) submit(intent.current); }}>Periksa permintaan yang sama</Button>}
     <Button variant="outline" disabled={mutation.isPending} onClick={refresh}>Muat ulang rencana dan review</Button>

@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 import { ApiClient, ApiFailure } from "@/lib/api/client";
-import { dataEnvelope } from "@/lib/api/contracts";
+import { dataEnvelope, errorEnvelope } from "@/lib/api/contracts";
 import { createSessionData } from "@/lib/query/client";
 import { applyFormFailure, checkinFormSchema, checkinResolver, formFailure } from "@/lib/forms/contracts";
 import { AsyncPanel } from "@/components/states/async-panel";
 import { createGateway } from "@/lib/api/bff";
-import { DomainError, errorResponse } from "../../SynCare-be/src/modules/contracts/errors";
+import { domainErrorFixtures, wireFailureResponse } from "./fixtures/domain-errors";
 
 const scopeA = { principalId: "synthetic-nurse-a", sessionGeneration: "session-a" };
 const scopeB = { principalId: "synthetic-nurse-b", sessionGeneration: "session-b" };
@@ -120,8 +120,16 @@ describe("session-scoped foundation", () => {
     expect(unknown).not.toContain("Coba lagi");
   });
 
-  test("backend domain errors cross the BFF/client contract without exposing upstream text", async () => {
-    const upstream = vi.fn<typeof fetch>(async () => errorResponse(new DomainError("version_conflict", { currentVersion: 7, resourceId: "p1" }), "backend-request"));
+  test("explicit synthetic wire fixtures carry the reviewed nested error metadata", () => {
+    for (const fixture of Object.values(domainErrorFixtures)) {
+      expect(errorEnvelope.parse(fixture.body)).toMatchObject({ error: { code: fixture.body.error.code, requestId: "synthetic-wire-request", retryable: fixture.body.error.retryable } });
+      expect(fixture.body.error.message.length).toBeGreaterThan(0);
+    }
+    expect(domainErrorFixtures.versionConflict.status).toBe(409);
+  });
+
+  test("synthetic nested wire payloads cross the BFF/client contract without exposing upstream text (not live interoperability)", async () => {
+    const upstream = vi.fn<typeof fetch>(async () => wireFailureResponse(domainErrorFixtures.versionConflict));
     const gateway = createGateway({
       resolveSession: async () => ({ token: "synthetic-server-only", csrfToken: "synthetic-csrf", principal: { id: scopeA.principalId, role: "nurse", displayName: "Synthetic staff" } }),
       backendOrigin: () => "https://backend.synthetic.invalid", webOrigin: () => "https://web.synthetic.invalid", allowLoopbackHttp: () => false, fetch: upstream,
@@ -131,7 +139,7 @@ describe("session-scoped foundation", () => {
       return gateway(new Request(`https://web.synthetic.invalid${input}`, { ...init, headers }), ["v1", "patients", "p1"]);
     };
     const api = new ApiClient({ fetch: browserTransport, csrfToken: "synthetic-csrf" });
-    await expect(api.request("/v1/patients/p1", { schema, method: "PATCH", body: { expectedVersion: 6 }, idempotencyKey: intent })).rejects.toMatchObject({ code: "version_conflict", details: { currentVersion: 7, resourceId: "p1", requestId: "backend-request" } });
+    await expect(api.request("/v1/patients/p1", { schema, method: "PATCH", body: { expectedVersion: 6 }, idempotencyKey: intent })).rejects.toMatchObject({ code: "version_conflict", details: { currentVersion: 7, resourceId: "synthetic-patient", requestId: "synthetic-wire-request" } });
     expect(new Headers(upstream.mock.calls[0]?.[1]?.headers).get("authorization")).toBe("Bearer synthetic-server-only");
     api.dispose();
   });

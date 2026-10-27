@@ -1,7 +1,7 @@
 import "server-only";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { unprotectEnvironment } from "../../../../SynCare-be/src/security/private-files.cjs";
+import { unprotectEnvironment } from "../security/private-config";
 
 export const SESSION_COOKIE = "syncare_session";
 export const SIGNED_OUT_COOKIE = "syncare_signed_out";

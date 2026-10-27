@@ -17,6 +17,17 @@ test("encrypted host cookie hides the backend token and rejects changes, wrong k
   expect(validCsrf(null, value.token, secret)).toBe(false);
 });
 
+test("browser auth rejects an unsupported DPAPI envelope even when its ciphertext exceeds the minimum length", () => {
+  const environment = { SYNCARE_SESSION_SECRET: randomBytes(32).toString("base64url"), SYNCARE_BACKEND_ORIGIN: "http://127.0.0.1:8080", SYNCARE_WEB_ORIGIN: "http://127.0.0.1:3000", SYNCARE_ALLOW_LOCAL_HTTP: "true" };
+  const ciphertext = `dpapi:v2:${randomBytes(64).toString("base64")}`;
+  expect(Buffer.byteLength(ciphertext)).toBeGreaterThanOrEqual(32);
+  let failure: unknown;
+  try { authConfiguration({ ...environment, SYNCARE_SESSION_SECRET: ciphertext }); } catch (error) { failure = error; }
+  expect((failure as Error)?.message).toBe("invalid_private_envelope");
+  expect(String(failure)).not.toContain(ciphertext);
+  expect(String(failure)).not.toContain(ciphertext.slice("dpapi:v2:".length, 48));
+});
+
 test("browser auth requires private key and exact HTTPS origins or the explicit loopback exception", () => {
   const environment = { SYNCARE_SESSION_SECRET: randomBytes(32).toString("base64url"), SYNCARE_BACKEND_ORIGIN: "http://127.0.0.1:8080", SYNCARE_WEB_ORIGIN: "http://127.0.0.1:3000", SYNCARE_ALLOW_LOCAL_HTTP: "true" };
   expect(authConfiguration(environment).webOrigin).toBe(environment.SYNCARE_WEB_ORIGIN);

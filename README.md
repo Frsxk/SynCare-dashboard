@@ -58,7 +58,9 @@ R02/CP03 is approved in DL-011. Session-local TanStack Query/API context is disp
 
 ## Run and verify
 
-Use Node >=20.9 (verified locally with Node 24.20.0). Dependencies are pinned in package.json/package-lock.json.
+Use Node >=20.9 (verified locally with Node 24.20.0). Dependencies are pinned in package.json/package-lock.json. These two gates are deliberately separate.
+
+**Standalone application and unit gate (no backend sibling, private data or `.env.local`):**
 
 ```powershell
 npm ci
@@ -66,12 +68,20 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+```
+
+`npm test` uses portable synthetic fixtures. It does not read a backend checkout or the demo dataset, and it does not prove live backend interoperability.
+
+**Private live browser integration (not part of the standalone gate):**
+
+```powershell
+npm run typecheck:integration
 npm run test:e2e -- --workers=1
 ```
 
-Playwright uses installed Microsoft Edge on Windows; set PLAYWRIGHT_CHANNEL for another installed compatible channel. Browser tests use a temporary Next server on 3101. Auth tests require the real local backend on 8080 and the privately provisioned account files; they start neither backend nor Langflow and do not mock authentication. Auth traces are disabled.
+The legacy `.spec.ts` files and their `local-accounts.ts`, `homecare-scenarios.ts`, `alert-scenarios.ts` and `m10-fixtures.ts` helpers expect repositories cloned as siblings with the historical `SynCare-be` name and private fixture/evidence files under its `data/` directory. `npm run typecheck:integration` covers that complete tree and fails closed when the sibling source is absent instead of pretending to be a standalone pass. The private `data/*.json` fixtures are loaded through runtime `new URL(...)` paths, so `tsc` does not validate them; when they are missing, the live browser gate must be reported as NOT RUN, not PASS. Playwright uses installed Microsoft Edge on Windows; set `PLAYWRIGHT_CHANNEL` for another installed compatible channel. Browser tests use a temporary Next server on 3101 and require the real local backend on 8080 plus the privately provisioned account files. They start neither backend nor Langflow, do not mock authentication, and can append real demo bookings/alerts/reviews; never run them casually against accepted data. Auth traces are disabled. Report missing prerequisites as NOT RUN, not PASS.
 
-`npm run dev` or the production `npm run start` binds 127.0.0.1:3000. `/login` exchanges credentials through a dedicated handler. `/workspace` redirects unverified/anonymous sessions to login; backend unavailability renders a retry state with data hidden. Configure private `.env.local` using `SYNCARE_BACKEND_ORIGIN`, `SYNCARE_WEB_ORIGIN`, `SYNCARE_ALLOW_LOCAL_HTTP` and random `SYNCARE_SESSION_SECRET` of at least 32 bytes. See the [account procedure](../docs/planning/demo-account-procedure.md).
+`npm run dev` or the production `npm run start` binds 127.0.0.1:3000. `/login` exchanges credentials through a dedicated handler. `/workspace` redirects unverified/anonymous sessions to login; backend unavailability renders a retry state with data hidden. Copy `.env.example` to ignored `.env.local` and set `SYNCARE_BACKEND_ORIGIN`, `SYNCARE_WEB_ORIGIN`, `SYNCARE_ALLOW_LOCAL_HTTP` and a private random `SYNCARE_SESSION_SECRET` of at least 32 bytes. Generate the secret locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`; never commit, log or paste the real value. The server-only `src/lib/security/private-config.ts` adapter unwraps `dpapi:v1:` values under the same Windows CurrentUser scope/entropy as the backend, without importing a sibling source path. See the [account procedure](../docs/planning/demo-account-procedure.md).
 
 ## Security boundary
 

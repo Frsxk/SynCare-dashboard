@@ -30,10 +30,14 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.test.ts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "next.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
   ],
   "exclude": [
     "node_modules"

@@ -1,0 +1,22 @@
+import { z } from "zod";
+import { wibInstant } from "@/features/homecare/contracts";
+const id = z.string().min(1).max(128), instant = z.string().datetime();
+export const alertStatus = z.enum(["PENDING_REVIEW", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED"]);
+export const statusLabels = { PENDING_REVIEW: "Menunggu review", ACKNOWLEDGED: "Diakui perawat", IN_PROGRESS: "Sedang ditindaklanjuti", RESOLVED: "Ditutup" } as const;
+export const actionTypeLabels = { contact_attempt: "Upaya menghubungi pasien", evaluation_guidance: "Dokumentasi arahan pemeriksaan atau fasilitas", homecare_review: "Review kebutuhan homecare", other: "Tindakan lain yang dicatat" } as const;
+export const actionTypes = ["contact_attempt", "evaluation_guidance", "homecare_review", "other"] as const;
+const source = z.object({ type: z.literal("F2"), reportId: id, attemptId: id, action: z.literal("escalate_immediately"), reason: z.string().min(1), reportedAt: instant, outcomeAt: instant }).strict();
+const summaryShape = { id, patientId: id, patientName: z.string().min(1), source, urgency: z.literal("acute"), status: alertStatus, version: z.number().int().positive(), acknowledgedAt: instant.nullable(), resolvedAt: instant.nullable(), createdAt: instant, updatedAt: instant };
+const timeline = z.object({ id, version: z.number().int().positive(), status: alertStatus, recordedAt: instant, patientSummary: z.string().min(1).nullable(), action: z.enum(["created", "acknowledge", "follow_up", "resolve"]), actorId: id.nullable(), occurredAt: instant, actionType: z.enum(actionTypes).nullable(), internalNote: z.string().min(1).nullable() }).strict();
+const validState = (value: { status: string; acknowledgedAt: string | null; resolvedAt: string | null }) => (value.status === "PENDING_REVIEW" ? value.acknowledgedAt === null : value.acknowledgedAt !== null) && (value.status === "RESOLVED" ? value.resolvedAt !== null : value.resolvedAt === null);
+export const alertSummary = z.object(summaryShape).strict().refine(validState, "Bukti status tidak sesuai.");
+export const alertDetail = z.object({ ...summaryShape, timeline: z.array(timeline).max(100), timelineNextCursor: z.string().min(1).nullable() }).strict().refine(validState, "Bukti status tidak sesuai.").superRefine((value, ctx) => {
+  if (value.timeline.some((entry, index) => entry.version > value.version || (index > 0 && value.timeline[index - 1].version >= entry.version))) ctx.addIssue({ code: "custom", message: "Urutan riwayat tidak valid." });
+});
+export type AlertDetail = z.infer<typeof alertDetail>;
+export const alertEnvelope = z.object({ data: alertDetail, requestId: z.string() });
+export const alertPage = z.object({ data: z.array(alertSummary).max(100), nextCursor: z.string().nullable(), requestId: z.string() });
+export const alertMutation = z.object({ data: z.object({ resource: alertDetail, replayed: z.boolean() }), requestId: z.string() });
+export type AlertAction = { action: "acknowledge"; expectedVersion: number; note?: string } | { action: "follow_up"; expectedVersion: number; actionType: typeof actionTypes[number]; occurredAt: string; note: string; patientSummary?: string } | { action: "resolve"; expectedVersion: number; note: string; patientSummary?: string };
+export const followupForm = z.object({ actionType: z.enum(actionTypes, { error: "Pilih jenis tindakan yang dicatat." }), occurredAt: z.string().refine(v => wibInstant(v) !== null, "Isi waktu tindakan dalam WIB."), note: z.string().trim().min(1, "Isi catatan tindakan internal.").max(4000), patientSummary: z.string().trim().max(4000) });
+export const resolutionForm = z.object({ note: z.string().trim().min(1, "Isi ringkasan penutupan internal.").max(4000), patientSummary: z.string().trim().max(4000) });

@@ -1,0 +1,31 @@
+import { expect, test } from "@playwright/test";
+import { createScenario, fillSchedule, openScenario, recordScenario, slotAfter, toWib } from "./homecare-scenarios";
+test.use({ trace: "off" });
+test("schedule_form_honest: explicit nurse, invalid interval, held commit and distinct confirmed slot", async ({ page }, info) => {
+  test.setTimeout(90000);
+  const booking = await createScenario("schedule-form"); await openScenario(page, booking.id);
+  await expect(page.getByLabel("Perawat kunjungan")).toHaveValue("");
+  await page.getByRole("button", { name: "Konfirmasi jadwal dan perawat", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Pilih perawat" })).toBeVisible();
+  const slot = slotAfter(); await fillSchedule(page, slot); await page.getByLabel("Selesai kunjungan (WIB)").fill(toWib(slot.start));
+  await page.getByRole("button", { name: "Konfirmasi jadwal dan perawat", exact: true }).click(); await expect(page.getByRole("alert").filter({ hasText: "Waktu selesai harus" })).toBeVisible();
+  await page.getByLabel("Selesai kunjungan (WIB)").fill(toWib(slot.end));
+  await page.setViewportSize({ width: 320, height: 800 }); await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.getByRole("region", { name: "Penjadwalan kunjungan" }).screenshot({ path: info.outputPath("m06-schedule-form-320-text200.png") });
+  let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route(`**/api/syncare/v1/bookings/${booking.id}/transitions`, async route => { if (route.request().postDataJSON().toStatus !== "Scheduled") return route.continue(); const response = await route.fetch(); expect(response.status()).toBe(200); await held; await route.fulfill({ response }); });
+  await page.getByRole("button", { name: "Konfirmasi jadwal dan perawat", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Menyimpan perubahan booking" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Jadwal dan perawat terkonfirmasi", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Status: Sedang ditinjau", { exact: true })).toBeVisible(); release();
+  await expect(page.getByText("Status: Terjadwal", { exact: true })).toBeVisible();
+  const stored = (await (await page.request.get(`/api/syncare/v1/bookings/${booking.id}`)).json()).data;
+  expect(stored.confirmedSlot.startAt).toBe(new Date(slot.start).toISOString()); expect(stored.confirmedSlot.startAt).not.toBe(stored.preferredWindow.startAt);
+  await page.screenshot({ path: info.outputPath("m06-scheduled.png"), fullPage: true });
+  await page.setViewportSize({ width: 320, height: 800 }); await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.getByLabel("Alasan untuk pasien").fill("Simulasi penjadwalan selesai diuji, booking ditutup oleh perawat."); await page.getByRole("button", { name: "Batalkan booking", exact: true }).click();
+  await expect(page.getByText("Status: Dibatalkan", { exact: true })).toBeVisible(); await expect(page.getByRole("heading", { name: "Riwayat jadwal dan perawat", exact: true })).toBeVisible();
+  for (const width of [768, 1280]) { await page.setViewportSize({ width, height: 800 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true); }
+  recordScenario("schedule", booking.id);
+});

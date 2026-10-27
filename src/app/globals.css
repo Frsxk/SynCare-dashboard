@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f6fa;
+  --foreground: #17283b;
+  --card: #ffffff;
+  --primary: #108444;
+  --primary-hover: #0c6b37;
+  --primary-foreground: #ffffff;
+  --muted: #edf1f7;
+  --muted-foreground: #4a576c;
+  --border: #64748b;
+  --divider: #dbe3ef;
+  --navigation: #264282;
+  --navigation-surface: #edf1fa;
+  --supporting-surface: #abb4cc;
+  --warning: #fff3d6;
+  --warning-foreground: #4a3600;
+  --urgent: #ffd5d1;
+  --urgent-foreground: #7a0f0f;
+  --radius: 0.75rem;
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 1rem; line-height: 1.5; }
+h1 { font-size: clamp(1.25rem, calc(1rem + 2vw), 2rem); line-height: 1.2; font-weight: 700; margin: 1rem 0; overflow-wrap: anywhere; }
+p { margin: 0 0 1rem; }
+a { color: var(--navigation); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+input:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.auth-page { max-width: 38rem; }
+.auth-card { background: var(--card); border: 1px solid var(--divider); border-radius: 1rem; padding: clamp(1rem, 4vw, 2rem); margin-top: 2rem; }
+.auth-form { display: grid; gap: 1.5rem; }
+.auth-form label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
+.auth-form input { display: block; width: 100%; min-height: 3rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; background: var(--card); color: var(--foreground); font: inherit; }
+.auth-form p { overflow-wrap: anywhere; }
+.workspace-header > * { min-width: 0; overflow-wrap: anywhere; }
+.table-viewport { min-width: 0; max-width: 100%; overflow-x: auto; }
+.table-viewport:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.table-viewport table { min-width: 100%; border-collapse: collapse; }
+.demo-notice { background: var(--warning); color: var(--warning-foreground); padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; }
+.brand { color: var(--navigation); font-size: 1.5rem; font-weight: 750; }
+.welcome { max-width: 44rem; margin: clamp(2rem, 7vw, 5rem) auto; padding: 0 1.5rem; }
+.welcome-description { font-size: 1.125rem; color: var(--muted-foreground); max-width: 36rem; }
+.workspace-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; justify-content: space-between; padding: 1rem clamp(1rem, 3vw, 2rem); background: var(--card); border-bottom: 1px solid var(--supporting-surface); }
+.workspace-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; }
+.workspace-identity > span, .workspace-account > span { color: var(--muted-foreground); font-size: 0.875rem; }
+.workspace-account { display: grid; gap: 0.125rem; font-size: 0.875rem; }
+.workspace-account strong { font-weight: 500; }
+.workspace-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; padding: 1rem; max-width: 90rem; margin: 0 auto; }
+.workspace-body main { min-width: 0; }
+.workspace-body nav { min-width: 0; }
+.module-list { padding: 0; margin: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 0.5rem; }
+.module-list a, .module-list > li > span { min-height: 3rem; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: var(--radius); color: var(--navigation); text-decoration: none; }
+.module-list a svg { flex-shrink: 0; }
+.module-list a > span { min-width: 0; overflow-wrap: anywhere; }
+.module-list a:hover { background: var(--muted); }
+.module-list a[aria-current="page"] { background: var(--navigation); color: white; font-weight: 650; }
+.module-list > li > span { flex-direction: column; align-items: start; }
+.module-list small { color: var(--muted-foreground); font-size: 0.75rem; }
+.skip-link { position: absolute; left: 1rem; top: -5rem; background: var(--card); padding: 0.75rem 1rem; z-index: 10; }
+.skip-link:focus { top: 1rem; }
+.data-panel { min-width: 0; overflow-wrap: anywhere; }
+.data-skeleton { min-height: 8rem; border-radius: 0.75rem; background: var(--muted); visibility: hidden; animation: reveal-skeleton 0s 180ms forwards; }
+@keyframes reveal-skeleton { to { visibility: visible; } }
+.clinical-section { margin-block: 1.5rem; padding: clamp(1rem, 3vw, 1.5rem); border: 1px solid var(--divider); border-radius: 1rem; background: var(--card); max-width: 58rem; }
+.clinical-section .clinical-section:not(.urgent-notice):not(.clinical-notice) { padding: 1.5rem 0 0; border: 0; border-top: 1px solid var(--divider); border-radius: 0; background: transparent; }
+.clinical-section h2 { font-size: 1.25rem; margin: 0 0 1rem; }
+.clinical-section h3 { font-size: 1.125rem; margin-block: 1.5rem 0.75rem; }
+.clinical-form { display: grid; gap: 1rem; }
+.clinical-form label { display: grid; gap: 0.5rem; font-weight: 600; }
+.clinical-form input, .clinical-form textarea { width: 100%; min-width: 0; min-height: 3rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); color: var(--foreground); background: var(--card); font: inherit; }
+.clinical-form textarea { resize: vertical; }
+.clinical-form select { width: 100%; min-width: 0; min-height: 3rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); color: var(--foreground); background: var(--card); font: inherit; }
+.clinical-form select:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.operational-dialog { max-inline-size: min(40rem, calc(100% - 2rem)); max-block-size: calc(100dvh - 2rem); padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius); color: var(--foreground); background: var(--card); overflow-y: auto; }
+.operational-dialog::backdrop { background: color-mix(in srgb, var(--foreground) 40%, transparent); }
+.clinical-form textarea:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.clinical-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.clinical-actions > button { max-width: 100%; overflow-wrap: anywhere; }
+.clinical-section button { white-space: normal; }
+.clinical-section p, .clinical-section li, .clinical-section dd { overflow-wrap: anywhere; }
+.clinical-section dd { margin-inline-start: 1rem; }
+.clinical-notice { background: var(--warning); color: var(--warning-foreground); padding: 1rem; }
+.urgent-notice { background: var(--urgent); color: var(--urgent-foreground); padding-inline: clamp(0.5rem, 2vw, 1rem); }
+.urgent-notice h2 { font-weight: 700; }
+.patient-list { padding: 0 clamp(1rem, 3vw, 1.5rem); list-style: none; background: var(--card); border: 1px solid var(--divider); border-radius: 1rem; max-width: 58rem; }
+.patient-list li { margin-block: 0.75rem; overflow-wrap: anywhere; border-bottom: 1px solid var(--divider); padding-bottom: 0.75rem; }
+.patient-list li:last-child { border-bottom: 0; }
+.patient-list a { display: inline-flex; align-items: center; min-height: 3rem; font-weight: 650; color: var(--navigation); text-underline-offset: 0.2em; }
+.table-viewport th { background: var(--navigation-surface); color: var(--navigation); text-align: start; font-weight: 650; }
+.table-viewport th, .table-viewport td { padding: 0.875rem 0.75rem; border-bottom: 1px solid var(--divider); vertical-align: top; }
+.workspace-tasks { display: grid; gap: 1rem; margin-block: 2rem; max-width: 58rem; }
+.task-card { display: flex; align-items: start; gap: 1rem; padding: 1.5rem; background: var(--card); border: 1px solid var(--divider); border-radius: 1rem; color: var(--foreground); text-decoration: none; }
+.task-card > svg { flex-shrink: 0; margin-top: 0.25rem; color: var(--navigation); }
+.task-card h2 { margin: 0 0 0.5rem; color: var(--navigation); font-size: 1.125rem; font-weight: 700; }
+.task-card p { margin: 0; color: var(--muted-foreground); }
+.task-card:hover { border-color: var(--navigation); background: var(--navigation-surface); }
+.session-panel { max-width: 58rem; border-top: 1px solid var(--divider); padding-block: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.session-panel h2 { font-size: 1rem; font-weight: 650; margin: 0 0 0.25rem; }
+.session-panel p { margin: 0; color: var(--muted-foreground); }
+.stored-source { white-space: pre-wrap; padding-block: 1rem; }
+.clinical-section summary { cursor: pointer; min-height: 3rem; padding-block: 0.75rem; }
+.clinical-section summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+@media (min-width: 42rem) { .workspace-tasks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 60rem) { .workspace-body { grid-template-columns: 13rem minmax(0, 1fr); padding: 2rem; gap: 2rem; } .module-list { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: 0s !important; } }
+

@@ -1,118 +1,235 @@
 # SynCare nurse dashboard
 
-Current M11 closure2026-10-27: READY_LOCAL_BROWSER. [Report](../docs/planning/mvp-verification-report.md), [runbook](../docs/planning/demo-runbook.md).50 units/type/lint/optimized build and6 combined browser scenarios PASS. Nurse HttpOnly/CSRF stays; server-only helper decrypts protected env under current Windows user. Test fixture readers compatible with protected account JSON. Identifiers/passwords unchanged; scripts/show-local-accounts.ps1 in backend is the private copy helper. Patient tab-session strategy is separate and explicitly documented. No original-engine restart or deployment; other targets deferred. Older entries historical.
+SynCare is a post-discharge follow-up service for CHF patients in Indonesian hospitals. This repository is the nurse-facing dashboard: a Next.js App Router application used by assigned nurses to review their patients, monitor home check-in reports, coordinate homecare visits, and act on clinical escalations.
 
-M11 current2026-10-27: [verification](../docs/planning/mvp-verification-report.md), [security](../docs/planning/security-verification.md), [accessibility](../docs/planning/ui-verification.md). Fresh50 units/type/lint PASS;3 actual browser security cases and2 keyboard/held-state/contrast/reflow cases PASS. Product source/build unchanged; nurse3000 retained, test server3101 separate. Both saved nurse accounts actually login200/session200. Copy matching credentials privately; Langflow does not verify passwords. M11 unconditional MVP NOT_READY with private at-rest handoff/patient web storage/Q10 recovery findings; nurse BFF cookie success does not close patient web storage. Earlier entries historical.
+The interface is in Indonesian. Clinical records, authorization decisions, and audit history live in the SynCare backend. The dashboard reaches them through a server-side Backend-for-Frontend (BFF), so browser JavaScript never receives a backend session token or a shared API key.
 
-## Pre-M11 design refinement,2026-10-26
+## Features
 
-Owner palette green/navy/steel, active labeled icon navigation, real workspace task cards, grouped queues/forms/records and readable tables. Existing modules, session/CSRF and clinical/source contracts retained. Final50 units/type/lint/build PASS;9 bff/navigation scenarios plus1 new design regression pass across separate runs. The new test checks actual four-module content at320/390/768/1280 and100%/200% text; final production capture also passes32 combinations and keyboard task-card navigation. [Both-client design evidence](../docs/planning/SYNCARE-PRE-M11-DESIGN-VERIFICATION.md). Local3000/backend8080; M11 unstarted, no deployment. Older entries below are historical.
+### Sign-in and session
 
-## Current M10 integration evidence,2026-10-26
+- Credential login at `/login`. A dedicated server handler exchanges the nurse's identifier and password with the backend; the raw session grant stays on the server.
+- The browser holds a sealed, HttpOnly session cookie plus a non-sensitive sign-out flag. Every protected page and every BFF request re-verifies the session with the backend before using it.
+- Backend sessions are valid for at most 24 hours and are not extended by dashboard activity. The cookie expires with the backend grant.
+- Logout revokes the backend session, clears the cookie, and notifies other open tabs through a `BroadcastChannel` so they hide patient content. If revocation cannot be confirmed, local access is still denied and the login page says the server revocation is unconfirmed.
+- Returning through the back/forward cache or refocusing a tab re-checks the session and hides patient content until the current identity is verified.
 
-M01-M09 accepted; M10 locally complete awaiting ACC, [report](../docs/planning/SYNCARE-M10-VERIFICATION.md). New tests/booking-escalation-e2e.spec.ts and tests/plan-qa-recovery-e2e.spec.ts use real patient API/Next nurse actions/backend/stores/Langflow. Saved original UUIDs/IDs in ignored M10 evidence make interrupted runs resume cases. Seven unique scenarios verified across separate runs; final50 unit/type/lint/build and production four-module/Completed/Resolved/review/context/logout320-text200/pageErrors0 PASS. Trace/credential logging disabled. Synthetic bookings/alerts/probes closed normally without old-data cleanup. Backend8080/nurse3000; native/deployed/whole-MVP unverified. M11 unauthorized before M10 ACC. Earlier status snapshots historical.
+### Workspace
 
-## Current local M09 behavior,2026-10-26
+`/workspace` is the signed-in landing page: task cards for the four clinical modules, the active account identifier, and a logout control.
 
-M01-M08 accepted; M09 locally complete awaiting ACC. Final T-1003 wiring covers four protected typed modules and patient/report/booking/alert/review details across direct URL, refresh, keyboard/back and account isolation. Existing feature links retained; mixed patient/review URL now shows typed invalid response and clears private source. Nurse Flutter not removed; M10 end-to-end acceptance remains separate.
+### Patients and care plans
 
-[M09 report](../docs/planning/SYNCARE-M09-VERIFICATION.md): final type/lint/50 units/build PASS; targeted2, remaining regression25 PASS/1 navigation timeout and final keyboard1 PASS cover26 unique scenarios across separate runs. Final optimized production four-module/review/mismatch/logout320-text200/pageErrors0 PASS. Test condition waits increased for observed cold compilation; no product authentication change. Start `npm run start -- --port 3000`; backend8080 required.113-file final client scan PASS. Native/deployed/whole-MVP open, M10-M11 unauthorized; earlier status notes historical.
+- `/patients` lists only patients assigned to the signed-in nurse, with cursor pagination. Nurses holding `patient.manage` can create a patient profile.
+- `/patients/[patientId]` shows the current discharge source, the confirmed risk category (F1) with its factors and rationale, assessment history, the latest report, and permission-gated profile and risk controls.
+- Recording a new discharge source requires a new assessment and an explicit confirmation. A source change never silently reuses an old confirmation; earlier evidence remains as history.
+- `/patients/[patientId]/care-plan` is the care-plan desk. It creates a guarded draft from the current confirmed assessment plus an explicit follow-up date and routine contact, starts the review, lists stored drafts and reviews, and exposes the human approval gate. Gate decisions are recorded against the current review version; a revision outcome opens a new draft with its own gate.
+- Plan review text is produced by the backend's Langflow plan-review pipeline (F3 draft, F4 review). The dashboard displays the stored artifact and gate options and never invents a plan locally.
 
-## Current local M08 behavior,2026-10-26
+### Monitoring
 
-M01-M07 accepted; M08 locally complete awaiting ACC. Patient detail -> care-plan desk creates guarded F3 from current confirmed F1 and explicit date/contact, starts actual F4, discovers stored reviews and renders actual gate options. One original UUID per authenticated-memory mutation; close/reopen and unknown-decision reconciliation preserve evidence without automatic resend. Request Changes creates revisedDRAFT with explicit new gate; only verified canonical row+audit is approved. Denied refresh clears private sources. Escalated/fallback plan outcome never claims an acute alert/call/dispatch.
+- `/monitoring` lists the latest check-in report for each assigned patient, with status, timing, and processing outcome.
+- `/monitoring/patients/[patientId]` shows that patient's report history. `/monitoring/reports/[checkinId]` shows one stored report: processing state, the original F1 baseline, the F2 outcome, and any adjustment details.
+- An urgent F2 outcome renders an urgent notice before the report metadata, with emergency guidance from the backend. The guidance is informational only; the dashboard does not place calls or dispatch help, and queued alert work is never presented as delivered assistance.
+- A report whose F1 baseline is missing is shown as stored but not analyzed rather than being scored with a default.
 
-[M08 report](../docs/planning/SYNCARE-M08-VERIFICATION.md): final type/lint/50 units/10 files/optimized build PASS;25 unique current browser scenarios across separate runs, actual source/approval/lost-response and final production keyboard/refresh/foreign denial/logout/pageErrors0. Final111-file client scan PASS. Start built dashboard `npm run start -- --port 3000`; backend8080 and user Langflow required. [Recovery runbook](../docs/planning/recovery-runbook.md) states runtime expiry/retention limits. Parent/native/deployed/whole-MVP unverified, M09-M11 unauthorized. All earlier current-status paragraphs below are historical.
+### Homecare
 
-Current local implementation includes M02 accounts, M03 assigned patient/risk, M04 monitoring, M05-M06 homecare and M07 operational escalation. Next.js App Router, TypeScript, Tailwind and existing primitives retained. M01-M06 accepted; M07 locally complete awaiting ACC. M08-M11 and final native/deployed/whole-MVP gates remain open.
+- `/homecare` is the booking queue for assigned patients, filterable by active/all/single status, with server-side pagination.
+- `/homecare/[bookingId]` shows the patient's immutable address and preferred window, the current booking state and version, and the full audit timeline.
+- Permitted actions follow the booking state: start review (`Requested` → `Under Review`), schedule with an eligible staff member and a confirmed WIB window, complete with the actual completion time and a patient-visible note, or cancel/reject with a required patient-visible reason.
+- The homecare catalogue is an explicitly synthetic DKI Jakarta service. The dashboard makes no availability, dispatch, or payment claim, and a preferred window is never shown as a confirmed schedule until a nurse chooses staff and time.
 
-## Current local M07 behavior,2026-10-26
+### Escalations
 
-Eskalasi opens `/escalations`, default active/status-filtered queue, then `/escalations/[alertId]` for exact original F2 source/report, operational history and permitted actions. Current alert.manage/assignment required. Explicit Akui alert -> documented category/actual WIB time/internal note -> Tutup alert with closure summary; public summary fields are optional deliberate publication. No read acknowledgment/direct resolve/reopen. Status never claims recovery, successful contact or dispatch.
+- `/escalations` is the operational alert queue, filtered by status.
+- `/escalations/[alertId]` shows the original F2 acute report, urgency, current status, and append-only operational history.
+- Nurses can acknowledge an alert, record a follow-up (category, actual WIB time, internal note, optional patient-visible summary), and close it with a closure summary. The optional summary fields are deliberate publication to the patient.
+- The dashboard never claims that a patient was reached, that help was dispatched, or that a case is clinically resolved.
 
-Unknown delivery retains original key/body;409 rereads without success. Future-time422 retains draft; successful follow-up alone resets it. Stale GET cannot rewind receipt; denied refresh clears private data. Type/lint/48 units/optimized build PASS. Actual targeted2 plus remaining regression23 cover24 unique browser scenarios across separate runs, including keyboard/narrow/text200/uncertainty/conflict/privacy. Actual production4-event closure/filter/foreign-denial/logout/pageErrors0 PASS. [M07 verification](../docs/planning/SYNCARE-M07-VERIFICATION.md) records exact limits; start existing build with `npm run start -- --port 3000`. Older milestone status notes below remain historical.
+### Accessibility and layout
 
-## Current local M06 behavior, 2026-10-26
+- Skip link to the main content, labeled navigation, semantic headings and tables, and `role="alert"`/`role="status"` for asynchronous states.
+- Wide tables sit in labeled, keyboard-focusable scroll regions instead of widening the page.
+- The completion form uses a native modal `<dialog>`; Escape closes it unless a submission is pending.
+- Layouts are designed for narrow screens (down to 320 px) and 200% text zoom. `prefers-reduced-motion` disables transitions and animations.
 
-Homecare defaults to Booking aktif; status/history filters query the server before pagination. Closed records remain accessible through their status or Semua booking. Assigned booking.manage nurses explicitly choose eligible staff and confirmed WIB times for Under Review, complete Scheduled via an explicit dialog with actual time/patient-visible note, or cancel/reject with a required public reason according to state. Preference and confirmed slot remain separate. No automatic staff choice, dispatch or recovered-patient claim.
+## Architecture
 
-All page actions share one retained original mutation intent. Unknown delivery locks action/payload/key until reconciliation; pending guards prevent double send.409 rereads, denied access clears content, and an old GET cannot rewind a newer receipt. Dialog Escape/focus/draft, keyboard navigation,320/text200 and768/1280 verified. Typecheck/lint,45 units,22 full browser tests plus final3 lifecycle checks, production build and actual production schedule/completion/filter/logout/foreign-denial smoke PASS. [M06 verification](../docs/planning/SYNCARE-M06-VERIFICATION.md). M06 awaits ACC; M07+ not authorized. Older notes below are historical.
+- Next.js 16 App Router with React 19 and strict TypeScript.
+- Tailwind CSS 4 for styling; Radix Slot, class-variance-authority, and lucide-react for primitives and icons.
+- TanStack Query for client data, TanStack Table for tabular views, React Hook Form with Zod for forms and contracts.
+- No global patient cache and no browser-persisted clinical data. Each protected client subtree creates a session-scoped QueryClient/ApiClient keyed by principal and session generation; it is disposed on logout, account change, or unmount, aborting transport and clearing cached data.
 
-## Current local M05 behavior, 2026-10-26
+### Request flow
 
-Homecare navigation opens `/homecare`; `/homecare/[bookingId]` shows assigned booking.manage patient name, immutable address/preference, actual state/version and audit timeline. Mulai review commits only Requested -> Under Review. Stale review409 refetches without success, lost committed response reconciles its original UUID, and denied detail removes private content. No scheduling/assignment/terminal action is exposed. Approved DKI Jakarta service is visibly simulation.
+1. `POST /api/auth/login` validates the request origin and JSON body, calls the backend login endpoint, rejects non-nurse grants, and sets the sealed session cookie.
+2. Server components call `resolveNurseSession()`, which opens the cookie and asks the backend `GET /api/v1/auth/session` for the current principal and expiry.
+3. Client features call `/api/syncare/v1/...`. The BFF re-resolves the session, enforces its route allowlist, Origin and CSRF checks, then forwards to `${SYNCARE_BACKEND_ORIGIN}/api/v1/...` with the server-held bearer token.
+4. Clinical mutations carry one UUID `Idempotency-Key` per user intent. Version conflicts require a fresh read; an unknown delivery outcome is surfaced as `outcome_unknown` and must be reconciled before retrying.
 
-Final41 unit/full18 Edge browser plus final2 homecare tests, typecheck/lint/production build and actual production review/foreign404/logout/pageErrors0 PASS. See [M05 verification](../docs/planning/SYNCARE-M05-VERIFICATION.md). M05 awaits ACC; M06+ not started.
+### Routes
 
-## Current local M04 behavior, 2026-10-25
+| Route | Access | Purpose |
+| --- | --- | --- |
+| `/` | Public | Product introduction and link to sign-in |
+| `/login` | Public | Nurse credential form |
+| `/workspace` | Nurse session | Module landing page |
+| `/patients`, `/patients/[patientId]` | Nurse session | Assigned registry, profile, discharge source, risk confirmation |
+| `/patients/[patientId]/care-plan` | Nurse session | Care-plan draft and review desk |
+| `/monitoring`, `/monitoring/patients/[patientId]`, `/monitoring/reports/[checkinId]` | Nurse session | Report queue, patient history, report detail |
+| `/homecare`, `/homecare/[bookingId]` | Nurse session | Booking queue and booking actions |
+| `/escalations`, `/escalations/[alertId]` | Nurse session | Alert queue and operational follow-up |
+| `POST /api/auth/login` | Same-origin | Credential exchange and cookie issue |
+| `GET`, `DELETE /api/auth/session` | Same-origin | Session snapshot / logout and revocation |
+| `GET`, `POST`, `PATCH`, `DELETE /api/syncare/[...path]` | Nurse session | Allowlisted backend gateway |
 
-Pemantauan opens `/monitoring` with assigned-only latest reports, keyboard-accessible history at `/monitoring/patients/[patientId]`, and persisted detail at `/monitoring/reports/[checkinId]`. Queries are session-scoped and bounded; source timestamps, numeric F1 baseline and original F2 outcome are rendered without scoring. Failed refresh retains permitted content; denied/not-found detail clears it.
+## Requirements
 
-Known urgent guidance precedes report metadata and also appears on the patient overview. Red semantic tokens match the existing Flutter high-risk palette; amber remains the demo notice. 119 is sourced information only, with no tel link or call. Queued alert work never implies received/dispatch. trigger_plan_review has its own indication and cannot replace confirmed F1. CP04 is authorized in DL-012; booking/escalation remain future modules. See [M04 verification](../docs/planning/SYNCARE-M04-VERIFICATION.md).
+- Node.js 20.9 or newer and npm. Use `npm ci` to install the versions pinned in `package-lock.json`.
+- A reachable SynCare backend exposing `/api/v1` (default `http://127.0.0.1:8080`), with accounts, patient assignments, and capabilities already provisioned. The dashboard never seeds data or creates accounts.
+- For care-plan review, the backend's Langflow integration must be running; the dashboard does not start or configure it.
+- For browser tests only: a Playwright browser plus private backend fixtures (see [Testing](#testing)).
 
-## M03 patient and risk baseline
+## Setup
 
-`/patients` shows the actual assigned registry and authorized create form. `/patients/[patientId]` shows scoped overview, profile/source edits, stored-source disclosure, exact F1 factors/rationale, explicit same-category confirmation and historical applicability. A new source requires new F1 and confirmation. Conflicts refetch authoritative state and retain input; failed writes never fabricate success. Profile creation receipt does not claim assignment/activation. The operator still owns those decisions.
-
-R02/CP03 is approved in DL-011. Session-local TanStack Query/API context is disposed on account changes. The default fetch receiver is bound to the browser global. Future domain sources/modules are explicitly unavailable. Final evidence: 36 unit/DOM and 14 Edge browser tests PASS, final actual-risk rerun PASS, lint/typecheck/build and production smoke PASS. See [M03 verification](../docs/planning/SYNCARE-M03-VERIFICATION.md). M03 awaits user ACC; no M04 work or deployment.
-
-## Run and verify
-
-Use Node >=20.9 (verified locally with Node 24.20.0). Dependencies are pinned in package.json/package-lock.json. These two gates are deliberately separate.
-
-**Standalone application and unit gate (no backend sibling, private data or `.env.local`):**
-
-```powershell
+```bash
 npm ci
+cp .env.example .env.local
+```
+
+On PowerShell use `Copy-Item .env.example .env.local`.
+
+Edit `.env.local`:
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `SYNCARE_BACKEND_ORIGIN` | Yes | Absolute backend origin, for example `http://127.0.0.1:8080`. No path, query, credentials, or fragment. |
+| `SYNCARE_WEB_ORIGIN` | Yes | Exact origin users load the dashboard from, for example `http://127.0.0.1:3000`. Used for Origin checks and to decide the cookie's `Secure` flag. |
+| `SYNCARE_SESSION_SECRET` | Yes | At least 32 bytes of private random material. Seals the session cookie and derives CSRF tokens. |
+| `SYNCARE_ALLOW_LOCAL_HTTP` | No | Set to `true` to permit `http://` for loopback hosts only (`localhost`, `127.0.0.1`, `[::1]`). Any other host requires HTTPS. |
+| `SYNCARE_PRIVATE_KEY_FILE` | Linux, when using `aesgcm:v1:` values | Absolute path to a separately provisioned raw 32-byte AES-256-GCM key file. |
+
+Generate a secret locally and paste it only into the ignored `.env.local`:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Never commit, log, or share the value. `.env*` is git-ignored except `.env.example`.
+
+Run the app:
+
+```bash
+npm run dev                    # development server on http://127.0.0.1:3000
+npm run build                  # production build
+npm run start -- --port 3000   # serve the production build
+```
+
+Both `dev` and `start` bind `127.0.0.1` explicitly. Production deployments normally sit behind a TLS-terminating reverse proxy on the same host rather than exposing the Next server directly. Set `SYNCARE_WEB_ORIGIN` to the public HTTPS origin in that case so Origin validation and the cookie's `Secure` flag match reality. The Next config emits `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, and `Cache-Control: private, no-store` for `/workspace`; add CSP and HSTS at the proxy.
+
+## Private configuration on Windows and Linux
+
+Sensitive environment values may be supplied in three forms:
+
+| Form | Platform | Handling |
+| --- | --- | --- |
+| Plain text | Any | Used as-is. Acceptable only from a protected process environment. |
+| `dpapi:v1:<base64>` | Windows | Decrypted with Windows DPAPI, `CurrentUser` scope, application entropy `SynCare.local.private.v1`. |
+| `aesgcm:v1:<base64>` | Linux | Decrypted with AES-256-GCM using the key named by `SYNCARE_PRIVATE_KEY_FILE`. |
+
+The server-only adapter in `src/lib/security/private-config.ts` unwraps any environment value carrying one of those prefixes when the auth configuration is loaded. Invalid or unsupported envelope versions fail closed with a code such as `invalid_private_envelope`; the underlying value is never included in the error.
+
+Linux key-file rules are enforced on open: absolute path, regular file, owned by the current user, mode `0600`, exactly one hard link, no symlink, exactly 32 bytes. The adapter opens with `O_NOFOLLOW`, reads the key, and never creates, repairs, or generates it. AES-GCM envelopes are `iv[12] || tag[16] || ciphertext`, authenticated with the additional data `SynCare.local.private.v1:aesgcm:v1`.
+
+Platform rules are strict:
+
+- `dpapi:v1:` values are rejected on Linux (`windows_protection_required`).
+- `aesgcm:v1:` values are rejected on Windows (`unsupported_private_envelope`).
+- DPAPI decryption uses the account that runs the process. Provision and run the dashboard under the same Windows account; a service account change makes earlier ciphertext unreadable.
+- Do not copy protected values between platforms or between accounts. Re-provision the secret natively on each host.
+
+## Security model
+
+- **Sealed session cookie.** `syncare_session` contains the backend session token and expiry, encrypted with AES-256-GCM under a key derived from `SYNCARE_SESSION_SECRET`, with the cookie name as additional authenticated data. It is `HttpOnly`, `SameSite=Lax`, host-only, `Path=/`, `Secure` when the web origin is HTTPS, and expires with the backend grant. A forged or truncated cookie fails authentication.
+- **Server-verified authority.** A cookie alone grants nothing. `resolveNurseSession()` calls the backend session endpoint on every protected render/request, requires a `nurse` principal, and rejects expired or non-nurse sessions. There is no role picker, hardcoded credential, or development bypass.
+- **CSRF.** Unsafe requests must carry the session-bound CSRF token: `HMAC-SHA256(secret-derived key, "csrf:" + sessionToken)`, compared in constant time. The token is issued to same-origin client code by `GET /api/auth/session`; it is not the backend token.
+- **Origin checks.** Login, logout, and every unsafe gateway request require an exact `Origin` match against `SYNCARE_WEB_ORIGIN`.
+- **BFF allowlist.** The gateway accepts only enumerated method/path combinations covering auth session exchange, patient registry/profile/assignment/discharge/questions, assessments and confirmations, check-ins and monitoring, emergency guidance, homecare services/staff/bookings/transitions, alerts/actions, and care-plan draft reviews, streams, and decisions. Unknown paths return 404 and disallowed methods 405.
+- **Input limits.** Path segments are restricted to a safe character set, only `cursor`, `limit`, `patientId`, and `status` query keys are accepted (query string capped at 4096 characters), request bodies must be JSON objects under 256 KiB, and non-auth mutations require a valid UUID `Idempotency-Key`.
+- **No credential passthrough.** The BFF builds fresh upstream headers, strips caller credentials, and never forwards cookies or an incoming `Authorization` header. Responses are `private, no-store`, `Vary: Cookie`, and carry an `X-Request-Id`.
+- **Transport discipline.** Upstream redirects are not followed (3xx becomes 503), non-JSON/non-SSE success bodies are rejected, and upstream calls time out (180 seconds for the gateway, 10 seconds for session verification). SSE responses stream through unbuffered.
+- **Logout and local denial.** Logout revokes the backend session and sets a 24-hour deny-only `syncare_signed_out` flag. If the backend is unreachable, the flag still closes local access and the UI explicitly reports that server revocation is unconfirmed. Other tabs are notified, and content is re-hidden on back/forward navigation or tab refocus until identity is re-verified.
+- **No browser persistence of clinical data.** The dashboard uses no `localStorage`, `sessionStorage`, or IndexedDB for patient data; query caches are in memory and disposed with the session.
+
+### Boundaries and non-goals
+
+- The dashboard is a client and BFF, not the authorization authority. The backend re-checks capabilities, assignments, versions, and state transitions on every call. Hiding a control in the UI is usability, not enforcement.
+- There is no MFA in this client. A backend `429` is surfaced as `rate_limited`; this is not a guarantee of rate limiting on clinical routes. Account quotas, traffic limits, and LLM-spend controls must be provided by the backend/deployment.
+- The CSRF token is intentionally readable by same-origin JavaScript, so an XSS foothold would defeat CSRF protection. The app renders no raw HTML and relies on React escaping; add a deployment CSP at the proxy.
+- The dashboard keeps no durable session store of its own. If the backend is unavailable, patient data stays hidden and the UI shows a retry state rather than stale content.
+- The app does not set CSP or HSTS itself; those belong to the deployment proxy.
+
+## Testing
+
+### Standalone gates
+
+These commands need no backend checkout, private data, or `.env.local`:
+
+```bash
 npm run typecheck
 npm run lint
 npm test
 npm run build
 ```
 
-`npm test` uses portable synthetic fixtures. It does not read a backend checkout or the demo dataset, and it does not prove live backend interoperability.
+- `npm test` runs Vitest over `tests/**/*.test.ts` in a Node environment with `server-only` stubbed. It covers contracts, the BFF, cookie/CSRF handling, both private-config platform paths, forms, and asynchronous UI states using synthetic fixtures. Passing it does not prove live backend interoperability.
+- `npm run build` compiles the production bundle with webpack (`next build --webpack`). The npm scripts select webpack explicitly for both dev and build.
 
-**Private live browser integration (not part of the standalone gate):**
+### Private browser integration
 
-```powershell
+The Playwright suite under `tests/**/*.spec.ts` exercises real nurse sessions, CSRF/Origin rejection, cookie replay, logout, patient scopes, and the four clinical modules against a live backend. It is not part of the standalone gate.
+
+```bash
+npx playwright install chromium      # Linux/macOS; Windows defaults to installed Edge
 npm run typecheck:integration
-npm run test:e2e -- --workers=1
+npm run test:e2e
 ```
 
-The legacy `.spec.ts` files and their `local-accounts.ts`, `homecare-scenarios.ts`, `alert-scenarios.ts` and `m10-fixtures.ts` helpers expect repositories cloned as siblings with the historical `SynCare-be` name and private fixture/evidence files under its `data/` directory. `npm run typecheck:integration` covers that complete tree and fails closed when the sibling source is absent instead of pretending to be a standalone pass. The private `data/*.json` fixtures are loaded through runtime `new URL(...)` paths, so `tsc` does not validate them; when they are missing, the live browser gate must be reported as NOT RUN, not PASS. Playwright uses installed Microsoft Edge on Windows; set `PLAYWRIGHT_CHANNEL` for another installed compatible channel. Browser tests use a temporary Next server on 3101 and require the real local backend on 8080 plus the privately provisioned account files. They start neither backend nor Langflow, do not mock authentication, and can append real demo bookings/alerts/reviews; never run them casually against accepted data. Auth traces are disabled. Report missing prerequisites as NOT RUN, not PASS.
+Prerequisites:
 
-`npm run dev` or the production `npm run start` binds 127.0.0.1:3000. `/login` exchanges credentials through a dedicated handler. `/workspace` redirects unverified/anonymous sessions to login; backend unavailability renders a retry state with data hidden. Copy `.env.example` to ignored `.env.local` and set `SYNCARE_BACKEND_ORIGIN`, `SYNCARE_WEB_ORIGIN`, `SYNCARE_ALLOW_LOCAL_HTTP` and a private random `SYNCARE_SESSION_SECRET` of at least 32 bytes. On Linux also set `SYNCARE_PRIVATE_KEY_FILE` to an absolute key path. Generate the secret locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`; never commit, log or paste the real value. The server-only `src/lib/security/private-config.ts` adapter unwraps `dpapi:v1:` values under the same Windows CurrentUser scope/entropy as the backend and, on Linux, decrypts `aesgcm:v1:` values with the raw 32-byte key named by `SYNCARE_PRIVATE_KEY_FILE` (current-user-owned regular file, mode 0600, one link, no symlink). DPAPI ciphertext cannot be decrypted on Linux and `aesgcm:v1:` is not accepted on Windows, so re-provision the secret natively on each platform instead of copying protected values between them. No sibling source path is imported. See the [account procedure](../docs/planning/demo-account-procedure.md).
+- A prepared SynCare backend on `http://127.0.0.1:8080` with demo accounts, assignments, and capabilities.
+- The backend checkout available as a sibling directory named `SynCare-be` next to this repository. The fixture helpers resolve imports such as `../../SynCare-be/src/security/private-files.cjs` and private JSON files under `../../SynCare-be/data/` (relative to `tests/`); a checkout with another directory name will fail module resolution.
+- Private account, manifest, scenario, and evidence files under that ignored `data/` directory, produced by the backend's operator provisioning scripts. They are never committed.
+- `.env.local` with a valid `SYNCARE_SESSION_SECRET`; Playwright starts its own dev server on `127.0.0.1:3101` and overrides `SYNCARE_WEB_ORIGIN` for that server.
 
-## Security boundary
+Notes:
 
-- The resolver opens an AES-GCM sealed HttpOnly cookie, then verifies the current session at Bun on each request. There is no role picker, hardcoded credential or development bypass. A cookie alone never supplies authority.
-- The BFF allowlists method/path/query combinations, strips caller credentials, uses server-only session context, checks Origin + session-bound CSRF on unsafe requests, forwards idempotency/cursor headers, and disables response/fetch caching.
-- Raw login grants never reach browser JavaScript through either handler. The dedicated exchange sets a host-only, SameSite=Lax cookie, Secure on HTTPS. Session-bound CSRF and exact Origin protect unsafe requests.
-- Unit tests inject synthetic session and upstream fixtures. Passing those tests is not evidence that multiuser authentication or a live backend is implemented.
-- SSE bodies stream without buffering. Transport failure/unknown mutation delivery does not mean an approval has expired or succeeded.
-- Only M02 auth/registry/assignment producer routes are implemented so far. An allowlist entry for a future route does not mean that feature exists in Bun.
-- Logout clears the cookie and revokes the current backend session. A persistent deny-only flag closes local access while offline and explicitly reports unconfirmed server revocation. BFCache/other-tab checks hide old content until the current identity is verified.
+- `npm run typecheck:integration` compiles the complete source and test tree, including specs that depend on the backend sibling. It fails closed when those sources or fixtures are absent; do not report it as a standalone pass.
+- The suite starts neither the backend nor Langflow. Missing prerequisites mean **NOT RUN**, not PASS.
+- Tests create real bookings, alerts, and reviews and write evidence files under the backend `data/` directory. Run them only against a disposable demo dataset, never against accepted data.
+- Playwright runs with one worker. On Windows it uses the installed Microsoft Edge channel by default; set `PLAYWRIGHT_CHANNEL` to use another installed channel.
 
-## Build choice and dependency note
+## Project layout
 
-Turbopack 16.4.3 failed on this Windows host with a PostCSS child-process IPC panic, both inside and outside the sandbox. Scripts use Next's supported Webpack mode; no TypeScript/build check is disabled. See [Next CLI](https://nextjs.org/docs/app/api-reference/cli/next).
+```text
+src/app/                 App Router pages, protected layout, and API handlers
+src/app/api/auth/        Login and session/logout handlers
+src/app/api/syncare/     Allowlisted backend gateway
+src/features/            Patients, monitoring, homecare, escalations, plans, risk
+src/components/          Shell, navigation, auth controls, UI primitives, states
+src/lib/api/             BFF gateway, typed API client, shared envelopes
+src/lib/auth/            Cookie sealing, session resolution, login/logout handlers
+src/lib/query/           Session-scoped QueryClient/ApiClient factory
+src/lib/security/        Windows DPAPI / Linux AES-GCM private-config adapter
+tests/                   Vitest unit/DOM tests and Playwright browser specs
+```
 
-Resolver 6.0.0 caused an optional Effect peer conflict. The lockfile uses @hookform/resolvers 5.2.2 with react-hook-form 7, which satisfies its verified peer contract. ESLint 9 is retained because the installed Next React lint plugin declares support through 9.7; its upstream support warning is recorded in the development log. No --force or --legacy-peer-deps is used.
+## Limitations
 
-Visual baseline follows DESIGN.md: clinical teal, amber synthetic notice, native system sans, light theme, low motion and no invented patient rows/statistics. Current evidence is in [M02 verification](../docs/planning/SYNCARE-M02-VERIFICATION.md).
-
-## Session-scoped data foundation (T-1002)
-
-`createSessionData({principalId, sessionGeneration}, {csrfToken})` constructs an independent in-memory QueryClient and ApiClient. Pass the backend-validated principal and an opaque per-session generation from the real M02 session boundary; this factory does not authenticate users or authorize patient IDs. There is no global SSR client or browser-persisted token/cache. On logout, expiry or account switch, dispose the old instance before using a new one; disposal aborts transport, cancels queries, clears cache and discards the CSRF token. Never reuse a disposed instance.
-
-Use `layer.options([domain, patientId, filters, cursor], path, responseSchema)` for queries. Keys include principal and session generation. Both query and mutation default retry are zero; reads can be retried explicitly. Clinical/status mutations must have no optimistic success and no automatic replay. Forms retain input on failures. A version conflict requires a fresh read; an unknown outcome requires reconciliation before a new intent.
-
-ApiClient accepts only same-origin /v1 paths through /api/syncare, whitelisted query names, cookie credentials and session-bound CSRF for writes. Callers supply one UUID idempotency key per intent. Zod validates response envelopes and structural form input; unexpected/malformed mutation results become outcome_unknown, never a fabricated resource. Raw upstream messages are not displayed. Approved empty 204 responses require an explicit undefined schema. No direct Langflow request or bearer storage exists here.
-
-`AsyncPanel` uses one tagged state for loading/empty/no-matches/error/content; content remains visible during refresh failure. Supply real recovery callbacks. Its error action must read/reconcile or restore a session, never blindly repeat a mutation. `applyFormFailure` sets a RHF root error without clearing the user's values. None of these helpers exposes a new clinical feature or bypasses the production session resolver.
-
-Unit/DOM tests cover late-session responses, stale refresh, bounded forms, risk and report recovery controls. Browser tests exercise actual nurse sessions, patient scopes, CSRF/Origin rejection, cookie replay, logout and narrow large-text login, plus actual registry, risk and monitoring workflows. CP03/CP04 mount independent session-local QueryClients; no global patient cache. Booking/escalation remain later work.
-
-`TableViewport` provides a labelled, keyboard-focusable scroll region around a semantic table. Supply a descriptive `label` and keep the table caption/column headers in the child table. Wide content scrolls within the region rather than expanding the page. The shell's skip link moves focus to the main content. Neither component authenticates users or exposes an unfinished module.
-
-M01 verification on 2026-10-25: 30 unit/DOM tests and seven Edge browser tests passed; lint, typecheck and production build passed. The shell/table fixture was checked at 320, 768 and 1200 pixels with 100% and 200% root text. Fixture screenshots are generated under the ignored `test-results/` directory. See [M01 verification](../docs/planning/SYNCARE-M01-VERIFICATION.md) for the acceptance mapping and remaining environment limitations.
+- This is a demonstration build, not a certified clinical product. Risk output is explicitly marked `not_clinically_validated` and `synthetic_demo_only`; care-plan artifacts carry a demo label and disclaimer and require human approval. Neither is medical advice.
+- The homecare catalogue is a simulation limited to DKI Jakarta. There is no real availability, dispatch, or payment.
+- Emergency guidance is informational. The dashboard does not call emergency services, page clinicians, or confirm that anyone received an alert.
+- Protected configuration is supported on Windows (DPAPI) and on Linux/POSIX hosts where the AES-GCM key-file ownership and mode rules can be satisfied. The Linux path is the one verified by the checked-in tests.
+- The dashboard targets a single backend origin per deployment; it is not multi-tenant.
+- Browser coverage is Chromium/Edge. Other evergreen browsers are expected to work but are not exercised by the checked-in suite.

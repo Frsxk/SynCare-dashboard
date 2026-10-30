@@ -5,7 +5,12 @@ export const alertStatus = z.enum(["PENDING_REVIEW", "ACKNOWLEDGED", "IN_PROGRES
 export const statusLabels = { PENDING_REVIEW: "Menunggu review", ACKNOWLEDGED: "Diakui perawat", IN_PROGRESS: "Sedang ditindaklanjuti", RESOLVED: "Ditutup" } as const;
 export const actionTypeLabels = { contact_attempt: "Upaya menghubungi pasien", evaluation_guidance: "Dokumentasi arahan pemeriksaan atau fasilitas", homecare_review: "Review kebutuhan homecare", other: "Tindakan lain yang dicatat" } as const;
 export const actionTypes = ["contact_attempt", "evaluation_guidance", "homecare_review", "other"] as const;
-const source = z.object({ type: z.literal("F2"), reportId: id, attemptId: id, action: z.literal("escalate_immediately"), reason: z.string().min(1), reportedAt: instant, outcomeAt: instant }).strict();
+export const sourceLabels = { F2: "F2 akut", PATIENT_REQUEST: "Permintaan bantuan mendesak dari pasien" } as const;
+const source = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("F2"), reportId: id, attemptId: id, action: z.literal("escalate_immediately"), reason: z.string().min(1), reportedAt: instant, outcomeAt: instant }).strict(),
+  z.object({ type: z.literal("PATIENT_REQUEST"), requestId: id, action: z.literal("request_immediate_help"), reason: z.string().min(1), reportedAt: instant, outcomeAt: instant.nullish() }).strict(),
+]);
+export type AlertSource = z.infer<typeof source>;
 const summaryShape = { id, patientId: id, patientName: z.string().min(1), source, urgency: z.literal("acute"), status: alertStatus, version: z.number().int().positive(), acknowledgedAt: instant.nullable(), resolvedAt: instant.nullable(), createdAt: instant, updatedAt: instant };
 const timeline = z.object({ id, version: z.number().int().positive(), status: alertStatus, recordedAt: instant, patientSummary: z.string().min(1).nullable(), action: z.enum(["created", "acknowledge", "follow_up", "resolve"]), actorId: id.nullable(), occurredAt: instant, actionType: z.enum(actionTypes).nullable(), internalNote: z.string().min(1).nullable() }).strict();
 const validState = (value: { status: string; acknowledgedAt: string | null; resolvedAt: string | null }) => (value.status === "PENDING_REVIEW" ? value.acknowledgedAt === null : value.acknowledgedAt !== null) && (value.status === "RESOLVED" ? value.resolvedAt !== null : value.resolvedAt === null);

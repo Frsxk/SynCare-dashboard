@@ -9,6 +9,7 @@ import { PatientSessionData, usePatientSession } from "@/features/patients/sessi
 import { visitTime } from "@/features/homecare/contracts";
 import { alertEnvelope, alertMutation, statusLabels, actionTypeLabels, type AlertAction, type AlertDetail as Alert } from "./contracts";
 import { AlertActionForms } from "./action-form";
+import { AlertSourceEvidence } from "./source-evidence";
 export function AlertDetailPage(props: { principalId: string; csrfToken: string; alertId: string }) { return <PatientSessionData key={`${props.principalId}:${props.csrfToken}:${props.alertId}`} {...props}><AlertDetail alertId={props.alertId} /></PatientSessionData>; }
 export function useAlertAction(alertId: string, onSaved: (alert: Alert, input: AlertAction) => Promise<void>, onConflict: () => void) {
   const session = usePatientSession(), intent = useRef<{ key: string; input: AlertAction } | null>(null), sending = useRef(false);
@@ -45,7 +46,7 @@ function AlertDetail({ alertId }: { alertId: string }) {
   const disabled = query.isFetching || query.isError || mutation.isPending || unknown;
   const refresh = () => { if (!unknown && !mutation.isPending) mutation.reset(); void query.refetch(); };
   const entries = [...new Map((query.data?.pages.flatMap(p => p.data.timeline) ?? []).map(entry => [entry.id, entry])).values()].sort((a, b) => a.version - b.version);
-  const content = alert ? <article className="clinical-record"><h2>Alert {alert.patientName}</h2><p><strong>Status: {statusLabels[alert.status]}</strong></p><p>Prioritas sumber: F2 akut. {alert.source.reason}</p><p>Laporan: {visitTime(alert.source.reportedAt)}</p><p>Hasil F2 dicatat: {visitTime(alert.source.outcomeAt)}</p><Link href={`/monitoring/reports/${alert.source.reportId}`}>Buka laporan sumber</Link>
+  const content = alert ? <article className="clinical-record"><h2>Alert {alert.patientName}</h2><p><strong>Status: {statusLabels[alert.status]}</strong></p><AlertSourceEvidence source={alert.source} />
     {alert.acknowledgedAt && <p>Diakui perawat: {visitTime(alert.acknowledgedAt)}</p>}{alert.resolvedAt && <p>Proses ditutup: {visitTime(alert.resolvedAt)}. Penutupan ini tidak menyatakan pasien sembuh.</p>}
     <section className="clinical-section"><h2>Riwayat operasional</h2><ol>{entries.map(e => <li key={e.id}><p><strong>{statusLabels[e.status]}</strong>. Dicatat: {visitTime(e.recordedAt)}</p>{e.actorId && <p>Pencatat: {e.actorId}</p>}{e.actionType && <p>{actionTypeLabels[e.actionType]}. Waktu tindakan: {visitTime(e.occurredAt)}</p>}{e.internalNote && <p>Catatan internal: {e.internalNote}</p>}{e.patientSummary && <p>Dipublikasikan untuk pasien: {e.patientSummary}</p>}</li>)}</ol>{query.hasNextPage && <Button variant="outline" disabled={query.isFetching || mutation.isPending} onClick={() => { void query.fetchNextPage(); }}>Muat riwayat sebelumnya</Button>}</section>
     <div role="status" aria-live="polite">{mutation.isPending ? <p>Menyimpan tindakan...</p> : mutation.isSuccess ? <p>Tindakan tersimpan.</p> : mutationFailure ? <p>{mutationFailure.message}</p> : null}</div>{unknown && <Button disabled={mutation.isPending} onClick={mutation.reconcile}>Periksa tindakan yang sama</Button>}

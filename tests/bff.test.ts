@@ -171,4 +171,19 @@ describe('BFF transport boundary (injected synthetic session; not a real login)'
     await reader.cancel();
     expect(cancelled).toBe(true);
   });
+
+  test('nurse boundary keeps alert reads/actions and never proxies patient emergency creation', async () => {
+    const emergency = (path: string, method: string) => new Request(`https://nurse.example.invalid/api/syncare/${path}`, {
+      method, body: method === 'POST' ? '{"reason":"Patient asks for help"}' : undefined,
+      headers: { 'content-type': 'application/json', origin: 'https://nurse.example.invalid',
+        'x-csrf-token': session.csrfToken, 'idempotency-key': 'fe74cf3c-7583-414e-a1ef-2f5211b1aaf0' },
+    });
+    const blocked = setup();
+    expect((await blocked.gateway(emergency('v1/patients/patient-a/emergencies', 'POST'), ['v1', 'patients', 'patient-a', 'emergencies'])).status).toBe(404);
+    expect(blocked.upstream).not.toHaveBeenCalled();
+    const allowed = setup();
+    expect((await allowed.gateway(get('v1/alerts'), ['v1', 'alerts'])).status).toBe(200);
+    expect((await allowed.gateway(emergency('v1/alerts/alert-a/actions', 'POST'), ['v1', 'alerts', 'alert-a', 'actions'])).status).toBe(200);
+    expect(allowed.upstream).toHaveBeenCalledTimes(2);
+  });
 });

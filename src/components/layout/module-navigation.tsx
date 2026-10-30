@@ -2,10 +2,10 @@
 
 import Link from "next/link.js";
 import { usePathname } from "next/navigation.js";
-import { Activity, HousePlus, Siren, UsersRound } from "lucide-react";
+import { Activity, House, HousePlus, Siren, UsersRound } from "lucide-react";
 import type { NavigationItem } from "./shell";
 
-const moduleIcons = { Pasien: UsersRound, Pemantauan: Activity, Homecare: HousePlus, Eskalasi: Siren };
+const moduleIcons = { Beranda: House, Pasien: UsersRound, Pemantauan: Activity, Homecare: HousePlus, Eskalasi: Siren };
 
 export function ModuleNavigation({ navigation }: { navigation: NavigationItem[] }) {
   const pathname = usePathname() ?? "";
